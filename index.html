@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Débit ↔ Vitesse</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Débit↔Vitesse" />
+  <style>
+    :root{--bg:#0a0f1f;--card:#111827;--border:#1f2937;--fg:#e5e7eb;--muted:#9aa4b2;--accent:#22d3ee;--danger:#ef4444}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(180deg,#0a0f1f,#0b1226);color:var(--fg);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;display:flex;align-items:center;justify-content:center;padding:16px}
+    .wrap{width:min(480px,100%)}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:hidden}
+    header{padding:18px 18px 10px;text-align:center}
+    header h1{margin:0;font-size:20px}
+    .row{display:flex;align-items:center;gap:6px;width:320px;max-width:100%}
+    .center{display:flex;justify-content:center}
+    .stack{display:flex;flex-direction:column;gap:12px;padding:16px}
+    label{width:120px;text-align:right;color:var(--muted);font-size:14px}
+    input{flex:1;padding:10px 12px;border-radius:12px;border:1px solid #243041;background:#0b1324;color:var(--fg);outline:none}
+    input:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(34,211,238,.15)}
+    .unit{padding-left:8px;color:var(--muted)}
+    .btnbar{display:flex;gap:10px;justify-content:center}
+    button{appearance:none;border:0;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer;color:#03121a;background:linear-gradient(180deg,#67e8f9,#22d3ee);box-shadow:0 6px 18px rgba(34,211,238,.35)}
+    button[disabled]{opacity:.55;cursor:default;filter:grayscale(.2)}
+    .title{color:var(--muted);text-align:center;margin-top:6px}
+    .big{font-size:22px;text-align:center;margin:4px 0 6px}
+    .status{color:#fff;text-align:center;min-height:20px}
+    .status.err{color:var(--danger)}
+    .footer{display:flex;justify-content:center;padding:6px 16px 16px}
+    .reset{width:160px;background:linear-gradient(180deg,#fecaca,#ef4444);color:#220505}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <h1>Débit ↔ Vitesse</h1>
+      </header>
+
+      <div class="stack">
+        <div class="center">
+          <div class="btnbar" style="width:260px">
+            <button id="btnDebit">Débit</button>
+            <button id="btnVitesse">Vitesse</button>
+          </div>
+        </div>
+
+        <div class="center"><div class="row">
+          <label for="diametre">Diamètre</label>
+          <input id="diametre" placeholder="ex: 200" inputmode="decimal" />
+          <span class="unit">mm</span>
+        </div></div>
+
+        <div class="center"><div class="row">
+          <label for="valeur">Valeur</label>
+          <input id="valeur" placeholder="ex: 100 (si Débit) ou 1.2 (si Vitesse)" inputmode="decimal" />
+          <span class="unit" id="valUnit">m³/h</span>
+        </div></div>
+
+        <div class="center"><div class="row">
+          <label for="longueur">Longueur</label>
+          <input id="longueur" placeholder="ex: 250" inputmode="decimal" />
+          <span class="unit">m</span>
+        </div></div>
+
+        <div class="title" id="resultTitle">La vitesse estimée</div>
+        <div class="big" id="resultValue">—</div>
+
+        <div class="title">Temps de trajet</div>
+        <div class="big" id="travelValue">—:—:—</div>
+
+        <div class="status err" id="status"></div>
+      </div>
+
+      <div class="footer">
+        <button class="reset" id="btnReset">Réinitialiser</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const MODE_INPUT_FLOW = 'Débit';
+    const MODE_INPUT_VELOCITY = 'Vitesse';
+    let mode = MODE_INPUT_FLOW;
+
+    function parseFloatLocalized(s){
+      if(!s) return null;
+      try{ return parseFloat(String(s).replace(',', '.')); }
+      catch{ return null; }
+    }
+    function fmt(x, digits=2){ return (x===null||!isFinite(x)) ? '—' : x.toFixed(digits); }
+    function sec_to_hhmmss(x){
+      if(x===null || !isFinite(x)) return '--:--:--';
+      if(x < 0) x = 0;
+      const h = Math.floor(x/3600);
+      const m = Math.floor((x - h*3600)/60);
+      const s = Math.floor(x % 60);
+      const pad=n=>String(n).padStart(2,'0');
+      return `${pad(h)}:${pad(m)}:${pad(s)}`;
+    }
+    function flow_from_velocity(d_mm, v_ms){
+      const d_m = d_mm * 1e-3;
+      const q_m3s = v_ms * Math.PI * (d_m ** 2) * 0.25;
+      return q_m3s * 3600.0;
+    }
+    function velocity_from_flow(d_mm, q_m3h){
+      const d_m = d_mm * 1e-3;
+      const v_mh = (4.0 * q_m3h) / (Math.PI * d_m ** 2);
+      return v_mh / 3600.0;
+    }
+    function travel_time_seconds(velocity_ms, length_m){
+      if(velocity_ms===null || velocity_ms<=0) return Infinity;
+      if(length_m===null || length_m < 0) return 0.0;
+      return length_m / velocity_ms;
+    }
+
+    const $ = id => document.getElementById(id);
+    const elDia = $('diametre');
+    const elVal = $('valeur');
+    const elLen = $('longueur');
+    const elValUnit = $('valUnit');
+    const elTitle = $('resultTitle');
+    const elMain = $('resultValue');
+    const elTravel = $('travelValue');
+    const elStatus = $('status');
+    const btnDebit = $('btnDebit');
+    const btnVitesse = $('btnVitesse');
+    const btnReset = $('btnReset');
+
+    function refreshButtons(){
+      if(mode===MODE_INPUT_FLOW){
+        elValUnit.textContent = 'm³/h';
+        elVal.placeholder = 'Débit (m³/h)';
+        elTitle.textContent = 'La vitesse estimée';
+        btnDebit.disabled = true; btnVitesse.disabled = false;
+      }else{
+        elValUnit.textContent = 'm/s';
+        elVal.placeholder = 'Vitesse (m/s)';
+        elTitle.textContent = 'Le débit estimé';
+        btnDebit.disabled = false; btnVitesse.disabled = true;
+      }
+    }
+
+    function renderResults(main_value, t_sec){
+      if(main_value===null){
+        elMain.textContent = '—';
+      }else{
+        if(mode===MODE_INPUT_FLOW){
+          elMain.textContent = `${fmt(main_value,3)} m/s`;
+        }else{
+          elMain.textContent = `${fmt(main_value,2)} m³/h`;
+        }
+      }
+      elTravel.textContent = (t_sec===null) ? '—:—:—' : sec_to_hhmmss(t_sec);
+    }
+
+    function recalc(){
+      const d_mm = parseFloatLocalized(elDia.value);
+      const val = parseFloatLocalized(elVal.value);
+      const L = parseFloatLocalized(elLen.value);
+      elStatus.textContent = '';
+
+      if(d_mm !== null && d_mm <= 0){
+        elStatus.textContent = 'Le diamètre doit être > 0.';
+        renderResults(null, null); return;
+      }
+      if(d_mm === null || val === null){
+        renderResults(null, null); return;
+      }
+
+      try{
+        if(mode===MODE_INPUT_FLOW){
+          let q = val * 0.9;
+          if(q < 0){ elStatus.textContent = 'Le débit ne peut pas être négatif.'; renderResults(null, null); return; }
+          const v = velocity_from_flow(d_mm, q);
+          let t = null;
+          if(L !== null){
+            if(L <= 0){ elStatus.textContent = 'La longueur doit être > 0.'; }
+            else { t = travel_time_seconds(v, L); }
+          }
+          renderResults(v, t);
+        }else{
+          const v = val;
+          if(v < 0){ elStatus.textContent = 'La vitesse ne peut pas être négative.'; renderResults(null, null); return; }
+          let q = flow_from_velocity(d_mm, v);
+          q = q * 0.9;
+          let t = null;
+          if(L !== null){
+            if(L <= 0){ elStatus.textContent = 'La longueur doit être > 0.'; }
+            else { t = travel_time_seconds(v, L); }
+          }
+          renderResults(q, t);
+        }
+      }catch(e){
+        elStatus.textContent = 'Erreur: ' + e;
+        renderResults(null, null);
+      }
+    }
+
+    btnDebit.addEventListener('click', ()=>{ mode = MODE_INPUT_FLOW; refreshButtons(); recalc(); });
+    btnVitesse.addEventListener('click', ()=>{ mode = MODE_INPUT_VELOCITY; refreshButtons(); recalc(); });
+    btnReset.addEventListener('click', ()=>{
+      mode = MODE_INPUT_FLOW;
+      elDia.value = ''; elVal.value=''; elLen.value=''; elStatus.textContent='';
+      refreshButtons(); recalc();
+    });
+
+    [elDia, elVal, elLen].forEach(inp=>{
+      inp.addEventListener('input', recalc);
+      inp.addEventListener('focus', ()=> setTimeout(()=> inp.scrollIntoView({block:'center', behavior:'smooth'}), 120));
+    });
+
+    refreshButtons();
+    recalc();
+  </script>
+</body>
+</html>
