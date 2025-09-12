@@ -127,6 +127,7 @@
     const $ = id => document.getElementById(id);
     const elDia = $('diametre');
     const elVal = $('valeur');
+    const elCoeff = $('coeff');
     const elLen = $('longueur');
     const elValUnit = $('valUnit');
     const elTitle = $('resultTitle');
@@ -167,6 +168,7 @@
     function recalc(){
       const d_mm = parseFloatLocalized(elDia.value);
       const val = parseFloatLocalized(elVal.value);
+      const coeff = parseFloatLocalized(elCoeff.value);
       const L = parseFloatLocalized(elLen.value);
       elStatus.textContent = '';
 
@@ -177,10 +179,15 @@
       if(d_mm === null || val === null){
         renderResults(null, null); return;
       }
+      if(coeff <= 0 && coeff >= 1){
+        elStatus.textContent = 'Le coefficient doit etre compris entre 0 et 1';
+        renderResults(null, null); return;
+      }
 
       try{
+        if ( coeff ==== null ) { coeff = 1}
         if(mode===MODE_INPUT_FLOW){
-          let q = val * 0.9;
+          let q = val * coeff;
           if(q < 0){ elStatus.textContent = 'Le débit ne peut pas être négatif.'; renderResults(null, null); return; }
           const v = velocity_from_flow(d_mm, q);
           let t = null;
@@ -193,7 +200,7 @@
           const v = val;
           if(v < 0){ elStatus.textContent = 'La vitesse ne peut pas être négative.'; renderResults(null, null); return; }
           let q = flow_from_velocity(d_mm, v);
-          q = q * 0.9;
+          q = q * coeff;
           let t = null;
           if(L !== null){
             if(L <= 0){ elStatus.textContent = 'La longueur doit être > 0.'; }
