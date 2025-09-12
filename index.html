@@ -17,12 +17,12 @@
     header{padding:18px 18px 10px;text-align:center}
     header h1{margin:0;font-size:20px}
     .row{display:flex;align-items:center;gap:6px;width:320px;max-width:100%}
-    .center{display:flex;justify-content:center;}
+    .center{display:flex;justify-content:center}
     .stack{display:flex;flex-direction:column;gap:12px;padding:16px}
     label{width:120px;text-align:right;color:var(--muted);font-size:14px}
     input{flex:1;padding:10px 12px;border-radius:12px;border:1px solid #243041;background:#fff;color:var(--fg);outline:none}
     input:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(34,211,238,.15)}
-    .unit{padding-left:8px;color:var(--muted)}
+    .unit{min-width:48px;padding-left:8px;color:var(--muted);text-align:left}
     .btnbar{display:flex;gap:10px;justify-content:center}
     button{appearance:none;border:0;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer;color:#03121a;background:linear-gradient(180deg,#67e8f9,#22d3ee);box-shadow:0 6px 18px rgba(34,211,238,.35)}
     button[disabled]{opacity:.55;cursor:default;filter:grayscale(.2)}
@@ -57,20 +57,20 @@
 
         <div class="center"><div class="row">
           <label for="valeur">Valeur</label>
-          <input id="valeur" placeholder="ex: 100 (si Débit) ou 1.2 (si Vitesse)" inputmode="decimal" />
+          <input id="valeur" placeholder="ex: 100 (si Débit) ou 1,2 (si Vitesse)" inputmode="decimal" />
           <span class="unit" id="valUnit">m³/h</span>
         </div></div>
-        <div class="center" ><div class="row" >
-          <label for="coeff" style = "margin-left : -25px;">Coefficient</label>
-          <input id="coeff"  placeholder="1 par default" inputmode="decimal" />
-          <span class="unit" id="valUnit">&nbsp&nbsp&nbsp&nbsp%</span>
-       
+
+        <div class="center"><div class="row">
+          <label for="coeff">Coefficient</label>
+          <input id="coeff" placeholder="1 par défaut (0–1]" inputmode="decimal" />
+          <span class="unit" id="coeffUnit">%</span>
         </div></div>
 
         <div class="center"><div class="row">
           <label for="longueur">Longueur</label>
           <input id="longueur" placeholder="ex: 250" inputmode="decimal" />
-          <span class="unit">&nbsp&nbsp&nbsp&nbspm</span>
+          <span class="unit">m</span>
         </div></div>
 
         <div class="title" id="resultTitle">La vitesse estimée</div>
@@ -94,7 +94,7 @@
     let mode = MODE_INPUT_FLOW;
 
     function parseFloatLocalized(s){
-      if(!s) return null;
+      if(!s && s !== 0) return null;
       try{ return parseFloat(String(s).replace(',', '.')); }
       catch{ return null; }
     }
@@ -111,16 +111,16 @@
     function flow_from_velocity(d_mm, v_ms){
       const d_m = d_mm * 1e-3;
       const q_m3s = v_ms * Math.PI * (d_m ** 2) * 0.25;
-      return q_m3s * 3600.0;
+      return q_m3s * 3600.0; // m³/h
     }
     function velocity_from_flow(d_mm, q_m3h){
       const d_m = d_mm * 1e-3;
       const v_mh = (4.0 * q_m3h) / (Math.PI * d_m ** 2);
-      return v_mh / 3600.0;
+      return v_mh / 3600.0; // m/s
     }
     function travel_time_seconds(velocity_ms, length_m){
       if(velocity_ms===null || velocity_ms<=0) return Infinity;
-      if(length_m===null || length_m < 0) return 0.0;
+      if(length_m===null || length_m <= 0) return null;
       return length_m / velocity_ms;
     }
 
@@ -168,7 +168,7 @@
     function recalc(){
       const d_mm = parseFloatLocalized(elDia.value);
       const val = parseFloatLocalized(elVal.value);
-      const coeff = parseFloatLocalized(elCoeff.value);
+      const coeffRaw = parseFloatLocalized(elCoeff.value);
       const L = parseFloatLocalized(elLen.value);
       elStatus.textContent = '';
 
@@ -179,33 +179,29 @@
       if(d_mm === null || val === null){
         renderResults(null, null); return;
       }
-      if(coeff <= 0 && coeff >= 1){
-        elStatus.textContent = 'Le coefficient doit etre compris entre 0 et 1';
+
+      // Coefficient: par défaut 1 si vide
+      const coeff = (coeffRaw===null || !isFinite(coeffRaw)) ? 1 : coeffRaw;
+      if(!(coeff > 0 && coeff <= 1)){
+        elStatus.textContent = 'Le coefficient doit être compris entre 0 et 1 (non nul).';
         renderResults(null, null); return;
       }
 
       try{
-        if ( coeff ==== null ) { coeff = 1}
         if(mode===MODE_INPUT_FLOW){
-          let q = val * coeff;
+          let q = val * coeff; // m³/h
           if(q < 0){ elStatus.textContent = 'Le débit ne peut pas être négatif.'; renderResults(null, null); return; }
-          const v = velocity_from_flow(d_mm, q);
-          let t = null;
-          if(L !== null){
-            if(L <= 0){ elStatus.textContent = 'La longueur doit être > 0.'; }
-            else { t = travel_time_seconds(v, L); }
-          }
+          const v = velocity_from_flow(d_mm, q); // m/s
+          const t = travel_time_seconds(v, L);
+          if(L !== null && L <= 0){ elStatus.textContent = 'La longueur doit être > 0.'; }
           renderResults(v, t);
         }else{
-          const v = val;
+          const v = val; // m/s
           if(v < 0){ elStatus.textContent = 'La vitesse ne peut pas être négative.'; renderResults(null, null); return; }
-          let q = flow_from_velocity(d_mm, v);
+          let q = flow_from_velocity(d_mm, v); // m³/h
           q = q * coeff;
-          let t = null;
-          if(L !== null){
-            if(L <= 0){ elStatus.textContent = 'La longueur doit être > 0.'; }
-            else { t = travel_time_seconds(v, L); }
-          }
+          const t = travel_time_seconds(v, L);
+          if(L !== null && L <= 0){ elStatus.textContent = 'La longueur doit être > 0.'; }
           renderResults(q, t);
         }
       }catch(e){
@@ -218,11 +214,11 @@
     btnVitesse.addEventListener('click', ()=>{ mode = MODE_INPUT_VELOCITY; refreshButtons(); recalc(); });
     btnReset.addEventListener('click', ()=>{
       mode = MODE_INPUT_FLOW;
-      elDia.value = ''; elVal.value=''; elLen.value=''; elStatus.textContent='';
+      elDia.value = ''; elVal.value=''; elCoeff.value=''; elLen.value=''; elStatus.textContent='';
       refreshButtons(); recalc();
     });
 
-    [elDia, elVal, elLen].forEach(inp=>{
+    [elDia, elVal, elCoeff, elLen].forEach(inp=>{
       inp.addEventListener('input', recalc);
       inp.addEventListener('focus', ()=> setTimeout(()=> inp.scrollIntoView({block:'center', behavior:'smooth'}), 120));
     });
