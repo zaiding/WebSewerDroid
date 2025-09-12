@@ -17,7 +17,7 @@
     header{padding:18px 18px 10px;text-align:center}
     header h1{margin:0;font-size:20px}
     .row{display:flex;align-items:center;gap:6px;width:320px;max-width:100%}
-    .center{display:flex;justify-content:center}
+    .center{display:flex;justify-content:center;}
     .stack{display:flex;flex-direction:column;gap:12px;padding:16px}
     label{width:120px;text-align:right;color:var(--muted);font-size:14px}
     input{flex:1;padding:10px 12px;border-radius:12px;border:1px solid #243041;background:#fff;color:var(--fg);outline:none}
@@ -60,11 +60,17 @@
           <input id="valeur" placeholder="ex: 100 (si Débit) ou 1.2 (si Vitesse)" inputmode="decimal" />
           <span class="unit" id="valUnit">m³/h</span>
         </div></div>
+        <div class="center" ><div class="row" >
+          <label for="coeff" style = "margin-left : -25px;">Coefficient</label>
+          <input id="coeff"  placeholder="0.9" value = "0.9" inputmode="decimal" />
+          <span class="unit" id="valUnit">&nbsp&nbsp&nbsp&nbsp%</span>
+       
+        </div></div>
 
         <div class="center"><div class="row">
           <label for="longueur">Longueur</label>
           <input id="longueur" placeholder="ex: 250" inputmode="decimal" />
-          <span class="unit">m</span>
+          <span class="unit">&nbsp&nbsp&nbsp&nbspm</span>
         </div></div>
 
         <div class="title" id="resultTitle">La vitesse estimée</div>
