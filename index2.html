@@ -81,9 +81,10 @@ function onEachFeature(feature, layer) {
       <b>Type :</b> ${type}<br>
     `;
 
-    //if (p.url) {
-    //  content += `<a href="${p.url}" target="_blank">Open Folder</a>`;
-    //}
+    let url = p.url;
+    if (url && typeof url === "string") {
+      content += `<a href="${encodeURI(url)}" target="_blank">📁 Open Folder</a>`;
+    }
 
     layer.bindPopup(content).openPopup();
 
