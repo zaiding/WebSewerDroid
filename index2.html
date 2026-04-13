@@ -104,6 +104,8 @@ fetch("pipeline_UU_2.geojson")
     }).addTo(map);
 
     map.fitBounds(geojsonLayer.getBounds());
+    map.fitBounds(geojsonLayer.getBounds());
+    console.log(geojsonLayer.getBounds());
 
   })
   .catch(err => console.error("ERREUR:", err));
