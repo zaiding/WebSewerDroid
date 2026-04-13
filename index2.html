@@ -89,6 +89,8 @@ function onEachFeature(feature, layer) {
     layer.bindPopup(content).openPopup();
 
   });
+  console.log("FEATURE COMPLETE:", feature);
+  console.log("PROPERTIES:", feature.properties);
 }
 
 // 🔹 7. Charger GeoJSON
